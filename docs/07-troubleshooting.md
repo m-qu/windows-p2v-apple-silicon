@@ -132,3 +132,69 @@ Short version: a live VSS-based capture with Fast Startup enabled at capture tim
 disk state that some import/repair paths can't reconcile, even though nothing about it looks
 broken to a standard filesystem check. Capturing the same disk fully offline instead
 (`dism /Capture-FFU` with Windows completely powered off) avoids the problem at the source.
+
+## 10. UTM "Import" converts and duplicates the disk, not a reference
+
+**Symptom:** after importing an existing VHDX into a new UTM VM, disk usage on the Mac increases
+by roughly the size of that disk, and the VM's configured drive filename doesn't match the file
+you imported (e.g. you imported `windows.vhdx` but the config references `windows.qcow2`).
+
+**Root cause:** UTM's Import doesn't create a reference/bookmark to the original file in place —
+it converts the disk to qcow2 (its native format) and copies the full result into the VM's own
+`.utm` bundle. This is a real, separate copy, not a lightweight linked clone: a ~360 GB VHDX became
+a genuine ~330 GB qcow2 file physically inside the bundle.
+
+**How to verify this on your own setup**, rather than taking it on faith:
+
+```bash
+# find the actual drive file UTM's config references
+plutil -p "/path/to/YourVM.utm/config.plist" | grep -A2 '"Drive"'
+# then check it directly
+qemu-img info "/path/to/YourVM.utm/Data/<ImageName from above>"
+qemu-img check "/path/to/YourVM.utm/Data/<ImageName from above>"
+```
+`virtual size` should match your original disk; `qemu-img check` should report no errors.
+
+**Fix / what to do about it:** not a bug to work around, just a space-planning fact. Keep enough
+free disk space for both copies to exist at once during the import. Once you've confirmed the new
+UTM VM boots correctly from its own qcow2 copy, the original VHDX is no longer what anything
+actually uses — safe to delete it (or keep it as an independent backup, which is a reasonable
+choice too, just not one UTM is making for you automatically).
+
+## 11. UTM settings that look saved but aren't
+
+**Symptom:** you configure something in a VM's settings — most commonly, importing a drive via a
+"New Drive" sub-dialog — close that sub-dialog, and the change is gone the next time you open
+settings. Separately: after moving a `.utm` bundle's folder on disk to a new location and
+re-opening it from there, the *old* location still shows up in UTM's VM list as an entry with
+"Zero KB" size that can't usefully be interacted with.
+
+**Root cause, first case:** UTM's settings sheets are nested — a drive-configuration sub-dialog has
+its own "Save", but that only commits the drive to the in-memory VM configuration; it does **not**
+write anything to disk until you also click the outer **Save** button at the bottom of the whole
+settings window. Closing the sub-dialog and stopping there discards the change.
+
+**Fix:** always click the main Save button after making changes, then re-open the VM's settings (or
+inspect `config.plist` directly, per item 10 above) to confirm what you changed is actually
+present — don't trust the UI's last-seen state.
+
+**Root cause, second case:** UTM tracks each VM in its own preferences via a security-scoped
+bookmark plus a plain path, keyed by the VM's UUID, in
+`~/Library/Containers/com.utmapp.UTM/Data/Library/Preferences/com.utmapp.UTM.plist` under a
+`Registry` dictionary. Moving the VM's folder outside of UTM's own "Move…" action (e.g. a plain
+`mv` from Terminal or Finder) leaves the old UUID's entry in that Registry pointing at a path that
+no longer exists — UTM has no way to know the folder was relocated, so it can't clean the entry up
+on its own, and its own "Delete" action on that entry may not behave usefully either since there's
+nothing real left to delete.
+
+**Fix:** confirm the stale entry is genuinely empty first (select it in UTM — it should show
+"Size: Zero KB" and a Path pointing at the old location), then, with UTM **fully quit**:
+
+```bash
+PLIST=~/Library/Containers/com.utmapp.UTM/Data/Library/Preferences/com.utmapp.UTM.plist
+cp "$PLIST" "$PLIST.bak"                       # keep a backup first
+/usr/libexec/PlistBuddy -c "Delete :Registry:<stale-UUID>" "$PLIST"
+```
+Get `<stale-UUID>` from `plutil -p "$PLIST"` — it's the key whose `Package → Path` points at the
+old, no-longer-existing location. Editing this file while UTM is still running risks it flushing
+its own in-memory copy back over your edit, undoing it — always quit the app first.
