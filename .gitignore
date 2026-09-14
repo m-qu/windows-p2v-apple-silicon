@@ -1,0 +1,11 @@
+# Local machine-specific config — copy from the .example files and edit, never commit your own
+scripts/mac/config.sh
+scripts/windows/config.cmd
+
+# Never accidentally commit an actual disk image or log from a real run
+*.vhdx
+*.vhd
+*.ffu
+*.log
+
+.DS_Store
