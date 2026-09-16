@@ -1,11 +1,16 @@
 # Local machine-specific config — copy from the .example files and edit, never commit your own
 scripts/mac/config.sh
 scripts/windows/config.cmd
+tools/win-disk-reader/config.env
 
 # Never accidentally commit an actual disk image or log from a real run
 *.vhdx
 *.vhd
 *.ffu
 *.log
+
+# win-disk-reader runtime state — created on demand, never meant to be committed
+tools/win-disk-reader/mnt/
+tools/win-disk-reader/output/
 
 .DS_Store

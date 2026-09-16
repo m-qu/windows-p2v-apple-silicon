@@ -104,6 +104,9 @@ Full prerequisite checklist: [`docs/02-prerequisites.md`](docs/02-prerequisites.
    into a normal UTM VM window.
 6. Something not matching what you see? Check [`docs/07-troubleshooting.md`](docs/07-troubleshooting.md)
    first — it covers nine real failures hit while building this, each with its root cause.
+7. Optional: [`docs/08-reading-files-without-booting.md`](docs/08-reading-files-without-booting.md)
+   to pull individual files off the VM's disk without ever powering it on — handy once it's
+   working and CPU-emulated boots feel too slow for a quick file grab.
 
 ## Repo layout
 
@@ -113,6 +116,7 @@ docs/diagrams/                Mermaid source for every diagram referenced above
 docs/legacy-failed-approach/  The abandoned live-capture path, kept as documented evidence
 scripts/mac/                  Run these on the Mac, in numeric order
 scripts/windows/              Run these on the Windows recovery media, in numeric order
+tools/win-disk-reader/        Optional: read files off the VM's disk without booting it
 ```
 
 Every script is meant to be read before it's run. They all pause for a typed confirmation before
